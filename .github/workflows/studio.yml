@@ -3,12 +3,13 @@ on: [push]
 jobs:
   render:
     runs-on: ubuntu-latest
-    container:
-      image: blenderkit/headless-blender:4.2
     steps:
       - uses: actions/checkout@v4
-      - name: Install FFmpeg, Fonts & TTS
-        run: apt-get update && apt-get install -y ffmpeg fonts-dejavu-core python3-pip && pip install edge-tts --break-system-packages
+      - name: Install Blender, FFmpeg & TTS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender ffmpeg fonts-dejavu-core python3-pip
+          pip install edge-tts --break-system-packages
       - name: Generate Documentary Voiceover (170 WPM)
         run: edge-tts --voice en-US-ChristopherNeural --rate="+5%" --file script.txt --write-media voiceover.mp3
       - name: Render 9:16 3D Blender Animation
