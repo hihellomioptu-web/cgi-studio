@@ -1,0 +1,17 @@
+name: Render CGI & Voiceover
+on: [push]
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    container:
+      image: blenderkit/headless-blender:4.2
+    steps:
+      - uses: actions/checkout@v4
+      - run: apt-get update && apt-get install -y ffmpeg python3-pip && pip install edge-tts --break-system-packages
+      - run: edge-tts --voice en-US-ChristopherNeural --file script.txt --write-media voiceover.mp3
+      - run: blender --background --python scene.py
+      - run: ffmpeg -framerate 24 -i output/frame_%04d.png -i voiceover.mp3 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest final_video.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-cgi-video
+          path: final_video.mp4
