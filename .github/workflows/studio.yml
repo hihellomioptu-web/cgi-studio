@@ -5,20 +5,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Blender, Virtual Display, FFmpeg & TTS
+      - name: Install FFmpeg & TTS
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender xvfb ffmpeg fonts-dejavu-core python3-pip
+          sudo apt-get install -y ffmpeg fonts-dejavu-core python3-pip
           pip install edge-tts --break-system-packages
-      - name: Generate Documentary Voiceover (170 WPM)
-        run: edge-tts --voice en-US-ChristopherNeural --rate="+5%" --file script.txt --write-media voiceover.mp3
-      - name: Render 9:16 3D Blender Animation
-        run: xvfb-run -a blender --background --python scene.py
-      - name: Composite Red Keyword Overlays & Merge Audio
-        run: |
-          VF=$(python3 overlay.py)
-          ffmpeg -framerate 3 -i output/frame_%04d.png -i voiceover.mp3 \
-          -vf "fps=30,${VF}" -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest sea_raiders_9x16.mp4
+      - name: Build Synced 9x16 Documentary
+        run: python3 make_video.py
       - name: Upload Vertical Short
         uses: actions/upload-artifact@v4
         with:
