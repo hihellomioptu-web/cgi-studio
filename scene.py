@@ -1,4 +1,4 @@
-import bpy, math
+import bpy, math, os
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -8,24 +8,13 @@ scene.render.resolution_y = 1920
 scene.render.fps = 30
 scene.frame_start = 1
 scene.frame_end = 288
-
-# Enable Blender 4.2 Compositor Glare (Bloom VFX)
-scene.use_nodes = True
-tree = scene.node_tree
-rl = tree.nodes.get("Render Layers")
-comp = tree.nodes.get("Composite")
-glare = tree.nodes.new(type="CompositorNodeGlare")
-glare.glare_type = 'FOG_GLOW'
-glare.threshold = 1.0
-glare.size = 7
-tree.links.new(rl.outputs["Image"], glare.inputs["Image"])
-tree.links.new(glare.outputs["Image"], comp.inputs["Image"])
+scene.render.image_settings.file_format = 'PNG'
 
 # Teal & Amber World Lighting
 world = bpy.data.worlds.new("TealAmberWorld")
 scene.world = world
 world.use_nodes = True
-world.node_tree.nodes["Background"].inputs.default_value = (0.015, 0.045, 0.055, 1)
+world.node_tree.nodes["Background"].inputs[0].default_value = (0.015, 0.045, 0.055, 1)
 
 def make_mat(name, color, metallic=0.2, roughness=0.4, emission=(0,0,0,1), emit_str=0.0):
     m = bpy.data.materials.new(name)
@@ -34,8 +23,13 @@ def make_mat(name, color, metallic=0.2, roughness=0.4, emission=(0,0,0,1), emit_
     b.inputs["Base Color"].default_value = color
     b.inputs["Metallic"].default_value = metallic
     b.inputs["Roughness"].default_value = roughness
-    b.inputs["Emission Color"].default_value = emission
-    b.inputs["Emission Strength"].default_value = emit_str
+    if "Emission Color" in b.inputs:
+        b.inputs["Emission Color"].default_value = emission
+        b.inputs["Emission Strength"].default_value = emit_str
+    elif "Emission" in b.inputs:
+        b.inputs["Emission"].default_value = emission
+        if "Emission Strength" in b.inputs:
+            b.inputs["Emission Strength"].default_value = emit_str
     return m
 
 mat_teal = make_mat("TealOcean", (0.02, 0.25, 0.30, 1), 0.1, 0.2)
@@ -46,8 +40,7 @@ mat_gem  = make_mat("KohINoor", (0.85, 0.95, 1.0, 1), 0.1, 0.02, (0.6, 0.85, 1.0
 
 # Stylized Ocean Plane
 bpy.ops.mesh.primitive_plane_add(size=40, location=(0, 0, -1.2))
-ocean = bpy.context.active_object
-ocean.data.materials.append(mat_teal)
+bpy.context.active_object.data.materials.append(mat_teal)
 
 # Four Carrack Ships
 for i in range(4):
@@ -100,5 +93,6 @@ rim = bpy.context.active_object
 rim.data.energy = 800
 rim.data.color = (0.1, 0.8, 0.9)
 
-scene.render.filepath = "//output/frame_"
+os.makedirs("output", exist_ok=True)
+scene.render.filepath = os.path.abspath("output/frame_")
 bpy.ops.render.render(animation=True)
