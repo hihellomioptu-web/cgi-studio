@@ -5,15 +5,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Blender, FFmpeg & TTS
+      - name: Install Blender, Virtual Display, FFmpeg & TTS
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender ffmpeg fonts-dejavu-core python3-pip
+          sudo apt-get install -y blender xvfb ffmpeg fonts-dejavu-core python3-pip
           pip install edge-tts --break-system-packages
       - name: Generate Documentary Voiceover (170 WPM)
         run: edge-tts --voice en-US-ChristopherNeural --rate="+5%" --file script.txt --write-media voiceover.mp3
       - name: Render 9:16 3D Blender Animation
-        run: blender --background --python scene.py
+        run: xvfb-run -a blender --background --python scene.py
       - name: Composite Red Keyword Overlays & Merge Audio
         run: |
           VF=$(python3 overlay.py)
