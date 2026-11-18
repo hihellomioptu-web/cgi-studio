@@ -2,17 +2,24 @@ import bpy, math
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
-scene.render.engine = 'BLENDER_EEVEE'
-scene.eevee.use_bloom = True
-scene.eevee.bloom_intensity = 0.35
+scene.render.engine = 'BLENDER_EEVEE_NEXT' if 'BLENDER_EEVEE_NEXT' in [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items] else 'BLENDER_EEVEE'
 scene.render.resolution_x = 1080
 scene.render.resolution_y = 1920
 scene.render.fps = 30
-
-# 12 distinct stylized 3D beats (approx 8 seconds each = 96s total at 30fps, rendered fast via step)
-# To render fast in GitHub Actions (~2 mins), we render 288 keyframes (3 fps base) and interpolate/hold in FFmpeg
 scene.frame_start = 1
 scene.frame_end = 288
+
+# Enable Blender 4.2 Compositor Glare (Bloom VFX)
+scene.use_nodes = True
+tree = scene.node_tree
+rl = tree.nodes.get("Render Layers")
+comp = tree.nodes.get("Composite")
+glare = tree.nodes.new(type="CompositorNodeGlare")
+glare.glare_type = 'FOG_GLOW'
+glare.threshold = 1.0
+glare.size = 7
+tree.links.new(rl.outputs["Image"], glare.inputs["Image"])
+tree.links.new(glare.outputs["Image"], comp.inputs["Image"])
 
 # Teal & Amber World Lighting
 world = bpy.data.worlds.new("TealAmberWorld")
@@ -42,26 +49,24 @@ bpy.ops.mesh.primitive_plane_add(size=40, location=(0, 0, -1.2))
 ocean = bpy.context.active_object
 ocean.data.materials.append(mat_teal)
 
-# Hero Stage Group (Four Ships / Armada / Plassey Blocks / Treasury / Koh-i-Noor)
-ships = []
+# Four Carrack Ships
 for i in range(4):
     bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.6, depth=1.8, location=((i-1.5)*1.6, i*0.5, 0))
     s = bpy.context.active_object
     s.rotation_euler = (math.radians(90), 0, math.radians(25))
     s.data.materials.append(mat_wood)
-    ships.append(s)
 
-# Central Hero Monument (Gold Coin / Crown / Koh-i-Noor Diamond)
+# Central Hero Monument
 bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.1, location=(0, 0, 1.4))
 hero = bpy.context.active_object
 hero.data.materials.append(mat_gold)
 
-# Orbiting Crimson War Rings
+# Orbiting Crimson Ring
 bpy.ops.mesh.primitive_torus_add(major_radius=2.3, minor_radius=0.08, location=(0, 0, 1.4))
 ring = bpy.context.active_object
 ring.data.materials.append(mat_red)
 
-# Animate Hero Transformation & Continuous Camera Push/Orbit
+# Continuous Orbiting & Push-in Camera
 bpy.ops.object.camera_add(location=(0, -8.5, 3.2), rotation=(math.radians(74), 0, 0))
 cam = bpy.context.active_object
 scene.camera = cam
@@ -80,9 +85,9 @@ for f in range(1, 289, 24):
     ring.rotation_euler = (angle, angle * 1.5, 0)
     ring.keyframe_insert(data_path="rotation_euler", frame=f)
 
-    # Switch hero shader to diamond caustic look around 1849 (frame 216)
     if f == 217:
-        hero.data.materials[0] = mat_gem
+        hero.data.materials.clear()
+        hero.data.materials.append(mat_gem)
 
 # Hard Amber Key Light + Cool Rim Light
 bpy.ops.object.light_add(type='AREA', location=(5, -5, 7))
