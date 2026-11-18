@@ -1,4 +1,4 @@
-name: Render CGI & Voiceover
+name: Render Sea Raiders 9x16
 on: [push]
 jobs:
   render:
@@ -7,11 +7,19 @@ jobs:
       image: blenderkit/headless-blender:4.2
     steps:
       - uses: actions/checkout@v4
-      - run: apt-get update && apt-get install -y ffmpeg python3-pip && pip install edge-tts --break-system-packages
-      - run: edge-tts --voice en-US-ChristopherNeural --file script.txt --write-media voiceover.mp3
-      - run: blender --background --python scene.py
-      - run: ffmpeg -framerate 24 -i output/frame_%04d.png -i voiceover.mp3 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest final_video.mp4
-      - uses: actions/upload-artifact@v4
+      - name: Install FFmpeg, Fonts & TTS
+        run: apt-get update && apt-get install -y ffmpeg fonts-dejavu-core python3-pip && pip install edge-tts --break-system-packages
+      - name: Generate Documentary Voiceover (170 WPM)
+        run: edge-tts --voice en-US-ChristopherNeural --rate="+5%" --file script.txt --write-media voiceover.mp3
+      - name: Render 9:16 3D Blender Animation
+        run: blender --background --python scene.py
+      - name: Composite Red Keyword Overlays & Merge Audio
+        run: |
+          VF=$(python3 overlay.py)
+          ffmpeg -framerate 3 -i output/frame_%04d.png -i voiceover.mp3 \
+          -vf "fps=30,${VF}" -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest sea_raiders_9x16.mp4
+      - name: Upload Vertical Short
+        uses: actions/upload-artifact@v4
         with:
-          name: final-cgi-video
-          path: final_video.mp4
+          name: sea-raiders-vertical-short
+          path: sea_raiders_9x16.mp4
