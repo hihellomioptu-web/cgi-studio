@@ -18,7 +18,7 @@ if topic:
 with open("script.txt") as f:
     script_text = f.read().strip()
 
-# Generate Voiceover + Captions
+# 1. Generate Neural Voiceover + Exact Subtitles
 subprocess.run([
     "edge-tts", "--voice", "en-US-ChristopherNeural", "--rate=+6%",
     "--file", "script.txt", "--write-media", "voiceover.mp3",
@@ -30,65 +30,68 @@ total_dur = float(subprocess.check_output([
     "-of", "default=noprint_wrappers=1:nokey=1", "voiceover.mp3"
 ]).decode().strip())
 
-# Generate Cinematic Background Drone + Ocean Wave Sound Effects via FFmpeg
+# 2. Generate Cinematic Background Drone + Ocean SFX
 subprocess.run([
     "ffmpeg", "-y",
     "-f", "lavfi", "-i", f"aevalsrc=0.06*sin(2*PI*55*t)+0.04*sin(2*PI*82.5*t):d={total_dur}",
     "-f", "lavfi", "-i", f"anoisesrc=c=pink:a=0.025:d={total_dur}",
-    "-filter_complex", "[0:a][1:a]amix=inputs=2:duration=shortest,afade=t=in:d=1.5,afade=t=out:st=" + str(max(0, total_dur-2)) + ":d=2[bg]",
+    "-filter_complex", f"[0:a][1:a]amix=inputs=2:duration=shortest,afade=t=in:d=1.5,afade=t=out:st={max(0, total_dur-2)}:d=2[bg]",
     "-map", "[bg]", "bg_sfx.mp3"
 ], check=True)
 
-# Mix Voiceover + Background Music & Ocean SFX
 subprocess.run([
     "ffmpeg", "-y", "-i", "voiceover.mp3", "-i", "bg_sfx.mp3",
     "-filter_complex", "[0:a]volume=1.35[vo];[1:a]volume=0.35[bg];[vo][bg]amix=inputs=2:duration=first[aout]",
     "-map", "[aout]", "-c:a", "aac", "-b:a", "192k", "full_audio.m4a"
 ], check=True)
 
-# Collect 3D Blender Renders + Generate AI CGI Scenes
+# 3. Collect 3D Blender Renders + Generate AI CGI Frames
 shots = sorted(glob.glob("renders_3d/*.png"))[:4]
 lines = [l.strip() for l in script_text.splitlines() if l.strip()]
 os.makedirs("renders_ai", exist_ok=True)
 style = "Unreal Engine 5 3D CGI render, hard amber sunlight shadows, teal atmosphere, cinematic 8k, vertical 9:16"
 
 for i in range(6):
-    beat = lines[i % len(lines)][:130]
+    beat = lines[i % len(lines)][:120]
     p = urllib.parse.quote(f"{beat}, {style}")
     u = f"https://pollinations.ai{p}?width=1080&height=1920&nologo=true&seed={200+i}"
     out_p = f"renders_ai/ai_{i:02d}.jpg"
     try:
         req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=15) as r, open(out_p, "wb") as f:
-            f.write(r.read())
-        shots.append(out_p)
+        with urllib.request.urlopen(req, timeout=20) as r, open(out_p, "wb") as f:
+            data = r.read()
+            if len(data) > 5000:
+                f.write(data)
+                shots.append(out_p)
     except Exception:
         pass
 
-# If OpenToonz .tnz file exists in repo, render 2D OpenToonz frames via tcomposer and include them
-if os.path.exists("scene2d.tnz"):
-    os.makedirs("renders_2d", exist_ok=True)
-    subprocess.run(["xvfb-run", "-a", "tcomposer", os.path.abspath("scene2d.tnz"), "-o", os.path.abspath("renders_2d/2d_.png")], check=False)
-    shots += sorted(glob.glob("renders_2d/*.png"))[:4]
+if not shots:
+    raise RuntimeError("No frames generated")
 
-shot_dur = total_dur / max(len(shots), 1)
+shot_dur = total_dur / len(shots)
 frames_per_shot = int(shot_dur * 30) + 15
 
+# 4. Parse VTT Timestamps Safely for Red Number Badges
 with open("captions.vtt") as f:
     vtt = f.read()
 
 red_cues = []
 for b in vtt.strip().split("\n\n"):
     lns = b.splitlines()
-    if len(lns) >= 3 and "-->" in lns:
-        t_start = lns.split("-->").strip()
-        p = re.split("[:.]", t_start)
-        sec = int(p)*3600 + int(p)*60 + int(p) + int(p)/1000.0
-        txt = " ".join(lns[2:])
-        nums = re.findall(r'\b(?:\$?\d[\d,.]*\s*(?:million|billion|trillion|ships|carats|years|men|%|CT)?)\b', txt, re.I)
-        if nums and len(nums.strip()) >= 2:
-            red_cues.append((sec, sec + 2.6, nums.upper().strip()))
+    for idx_line, line in enumerate(lns):
+        if "-->" in line and idx_line + 1 < len(lns):
+            t_start = line.split("-->")[0].strip()
+            p = re.split("[:.]", t_start)
+            if len(p) >= 4:
+                sec = int(p[0])*3600 + int(p[1])*60 + int(p[2]) + int(p[3])/1000.0
+                txt = " ".join(lns[idx_line+1:])
+                nums = re.findall(r'\b(?:\$?\d[\d,.]*\s*(?:million|billion|trillion|ships|carats|years|men|%|CT)?)\b', txt, re.I)
+                if nums and len(nums[0].strip()) >= 2:
+                    red_cues.append((sec, sec + 2.6, nums[0].upper().strip()))
+            break
 
+# 5. Assemble Smooth Camera Zooms, Transitions, Shadows, Red Badges & Subtitles
 inputs, filters = [], []
 for idx, img in enumerate(shots):
     inputs += ["-loop", "1", "-t", f"{shot_dur + 0.5:.2f}", "-i", img]
@@ -97,11 +100,11 @@ for idx, img in enumerate(shots):
 
 prev = "[v0]"
 for idx in range(1, len(shots)):
-    off = idx * shot_dur - 0.4
+    off = max(0.1, idx * shot_dur - 0.4)
     filters.append(f"{prev}[v{idx}]xfade=transition=fadeblack:duration=0.4:offset={off:.2f}[xf{idx}];")
     prev = f"[xf{idx}]"
 
-title = (topic.upper() if topic else "SEA RAIDERS OF INDIA")[:28].replace(":", "\\:")
+title = (topic.upper() if topic else "FALL OF THE MUGHAL EMPIRE")[:28].replace(":", "\\:")
 fx = [
     f"{prev}vignette=PI/4,eq=contrast=1.12:saturation=1.18",
     "drawbox=x=0:y=1150:w=1080:h=770:color=black@0.48:t=fill",
@@ -120,21 +123,5 @@ subprocess.run([
     "-map", "[outv]", "-map", f"{len(shots)}:a",
     "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
     "-c:a", "copy", "-shortest", "cgi_studio_final.mp4"
-
-
-cd ~/cgi-studio
-
-# 1. Fix mathutils import in build_3d.py
-sed -i 's/import bpy, math, os/import bpy, math, os\nfrom mathutils import Vector/' build_3d.py
-sed -i 's/bpy.mathutils.Vector/Vector/g' build_3d.py
-
-# 2. Fix director.py list indexing bug (lines[1] instead of lines)
-cat << 'EOF' > fix_director.py
-with open("director.py") as f:
-    code = f.read()
-code = code.replace('t_start = lns.split("-->").strip()', 't_start = lns[1].split("-->")[0].strip()')
-code = code.replace('sec = int(p)*3600 + int(p)*60 + int(p) + int(p)/1000.0', 'sec = int(p[0])*3600 + int(p[1])*60 + int(p[2]) + int(p[3])/1000.0')
-code = code.replace('if nums and len(nums.strip()) >= 2:', 'if nums and len(nums[0].strip()) >= 2:')
-code = code.replace('nums.upper().strip()', 'nums[0].upper().strip()')
-with open("director.py", "w") as f:
-    f.write(code)
+], check=True)
+print("ALL DONE!")
