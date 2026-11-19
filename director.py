@@ -59,7 +59,7 @@ for i in range(6):
     out_p = f"renders_ai/ai_{i:02d}.jpg"
     try:
         req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=45) as r, open(out_p, "wb") as f:
+        with urllib.request.urlopen(req, timeout=15) as r, open(out_p, "wb") as f:
             f.write(r.read())
         shots.append(out_p)
     except Exception:
