@@ -13,7 +13,7 @@ jobs:
       - name: Build 3D Models, Characters & Shadows in Blender
         run: xvfb-run -a blender --background --python build_3d.py
       - name: Run AI CGI Director, SFX & Voiceover
-        run: python3 director.py $(cat topic.txt 2>/dev/null || echo "")
+        run: python3 director.py
       - name: Upload Finished Studio Video
         uses: actions/upload-artifact@v4
         with:

@@ -1,6 +1,6 @@
 import os, sys, json, re, urllib.request, urllib.parse, subprocess, glob
 
-topic = " ".join(sys.argv[1:]).strip() if len(sys.argv) > 1 else ""
+topic = open("topic.txt").read().strip() if os.path.exists("topic.txt") else ""
 
 if topic:
     q = urllib.parse.quote(topic)
