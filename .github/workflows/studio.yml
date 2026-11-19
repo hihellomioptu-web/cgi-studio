@@ -1,19 +1,19 @@
-name: Render Sea Raiders 9x16
+name: CGI Studio Pro Pipeline
 on: [push]
 jobs:
-  render:
+  produce:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install FFmpeg & TTS
+      - name: Install FFmpeg, Fonts & Neural TTS
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core python3-pip
           pip install edge-tts --break-system-packages
-      - name: Build Synced 9x16 Documentary
-        run: python3 make_video.py
-      - name: Upload Vertical Short
+      - name: Run AI CGI & VFX Director
+        run: python3 director.py $(cat topic.txt 2>/dev/null || echo "")
+      - name: Upload Finished CGI Video
         uses: actions/upload-artifact@v4
         with:
-          name: sea-raiders-vertical-short
-          path: sea_raiders_9x16.mp4
+          name: cgi-studio-video
+          path: cgi_studio_final.mp4
