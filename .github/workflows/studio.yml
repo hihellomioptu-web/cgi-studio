@@ -1,18 +1,21 @@
-name: CGI Studio Pro Pipeline
+name: Full CGI, 3D, OpenToonz & Audio Studio
 on: [push]
 jobs:
   produce:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install FFmpeg, Fonts & Neural TTS
+      - name: Install Blender 3D, OpenToonz 2D, FFmpeg & TTS
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core python3-pip
+          sudo apt-get install -y blender xvfb ffmpeg fonts-dejavu-core python3-pip
+          sudo apt-get install -y opentoonz || sudo snap install opentoonz || true
           pip install edge-tts --break-system-packages
-      - name: Run AI CGI & VFX Director
+      - name: Build 3D Models, Characters & Shadows in Blender
+        run: xvfb-run -a blender --background --python build_3d.py
+      - name: Run AI CGI Director, OpenToonz, SFX & Voiceover
         run: python3 director.py $(cat topic.txt 2>/dev/null || echo "")
-      - name: Upload Finished CGI Video
+      - name: Upload Finished Studio Video
         uses: actions/upload-artifact@v4
         with:
           name: cgi-studio-video
